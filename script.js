@@ -8,7 +8,7 @@ const tipoComprobanteMap = {
     '7': 'NOTAS DE DEBITO B',
     '8': 'NOTAS DE CREDITO B',
     '9': 'RECIBOS B',
-    '1': 'NOTAS DE VENTA AL CONTADO B',
+    '10': 'NOTAS DE VENTA AL CONTADO B',
     '11': 'FACTURAS C',
     '12': 'NOTAS DE DEBITO C',
     '13': 'NOTAS DE CREDITO C',
@@ -20,10 +20,10 @@ const tipoComprobanteMap = {
     '20': 'NOTAS DE DEBITO POR OPERACIONES CON EL EXTERIOR',
     '21': 'NOTAS DE CREDITO POR OPERACIONES CON EL EXTERIOR',
     '22': 'FACTURAS - PERMISO EXPORTACION SIMPLIFICADO - DTO. 855/97',
-    '23': 'COMPROBANTES “A” DE COMPRA PRIMARIA PARA EL SECTOR PESQUERO MARITIMO',
-    '24': 'COMPROBANTES “A” DE CONSIGNACION PRIMARIA PARA EL SECTOR PESQUERO MARITIMO',
-    '25': 'COMPROBANTES “B” DE COMPRA PRIMARIA PARA EL SECTOR PESQUERO MARITIMO',
-    '26': 'COMPROBANTES “B” DE CONSIGNACION PRIMARIA PARA EL SECTOR PESQUERO MARITIMO',
+    '23': 'COMPROBANTES "A" DE COMPRA PRIMARIA PARA EL SECTOR PESQUERO MARITIMO',
+    '24': 'COMPROBANTES "A" DE CONSIGNACION PRIMARIA PARA EL SECTOR PESQUERO MARITIMO',
+    '25': 'COMPROBANTES "B" DE COMPRA PRIMARIA PARA EL SECTOR PESQUERO MARITIMO',
+    '26': 'COMPROBANTES "B" DE CONSIGNACION PRIMARIA PARA EL SECTOR PESQUERO MARITIMO',
     '27': 'LIQUIDACION UNICA COMERCIAL IMPOSITIVA CLASE A',
     '28': 'LIQUIDACION UNICA COMERCIAL IMPOSITIVA CLASE B',
     '29': 'LIQUIDACION UNICA COMERCIAL IMPOSITIVA CLASE C',
@@ -101,6 +101,21 @@ let tableData = [];
 
 document.getElementById('process-btn').addEventListener('click', processFiles);
 document.getElementById('export-btn').addEventListener('click', exportToExcel);
+document.getElementById('file-input').addEventListener('change', updateProcessButton);
+
+function updateProcessButton() {
+    const fileInput = document.getElementById('file-input');
+    const processBtn = document.getElementById('process-btn');
+    const fileCount = fileInput.files.length;
+    
+    if (fileCount > 0) {
+        processBtn.innerHTML = `Procesar ${fileCount} PDF${fileCount !== 1 ? 's' : ''} <i class="material-icons right">send</i>`;
+        processBtn.disabled = false;
+    } else {
+        processBtn.innerHTML = `Procesar PDFs <i class="material-icons right">send</i>`;
+        processBtn.disabled = true;
+    }
+}
 
 async function processFiles() {
     const fileInput = document.getElementById('file-input');
@@ -122,6 +137,8 @@ async function processFiles() {
     tableContent += `</table>`;
     document.getElementById('output').innerHTML = tableContent;
     document.getElementById('export-btn').style.display = 'block';
+
+    updateProcessButton();
 }
 
 function createTableHeader() {
@@ -255,3 +272,8 @@ function exportToExcel() {
     XLSX.utils.book_append_sheet(wb, ws, "Datos de Facturas");
     XLSX.writeFile(wb, "datos_facturas.xlsx");
 }
+
+// Asegúrate de que el botón esté deshabilitado inicialmente
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('process-btn').disabled = true;
+});
