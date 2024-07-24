@@ -146,19 +146,18 @@ function createTableHeader() {
     <table id="data-table">
         <tr>
             <th>Archivo</th>
-            <th>Ver</th>
             <th>Fecha</th>
             <th>CUIT</th>
-            <th>Punto de Venta</th>
             <th>Tipo de Comprobante</th>
+            <th>Punto de Venta</th>
             <th>Número de Comprobante</th>
             <th>Importe</th>
-            <th>Moneda</th>
-            <th>CTZ</th>
             <th>Tipo de Documento del Receptor</th>
             <th>Número de Documento del Receptor</th>
             <th>Tipo de Código de Autorización</th>
             <th>Código de Autorización</th>
+            <th>Cantidad</th>
+            <th>Periodo</th>
         </tr>`;
 }
 
@@ -167,7 +166,7 @@ async function processFile(file) {
     const context = canvas.getContext('2d');
 
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer, password: '', cMapUrl: 'cmaps/', cMapPacked: true }).promise;
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const page = await pdf.getPage(1);
 
     const scale = 2.5;
@@ -182,29 +181,39 @@ async function processFile(file) {
 
     await page.render(renderContext).promise;
 
+    // Extraer el texto del PDF
+    const textContent = await page.getTextContent();
+    const texto = textContent.items.map(item => item.str).join(' ');
+
+    // Extraer cantidad y período
+    const cantidad = extraerCantidad(texto);
+    const periodo = extraerPeriodo(texto);
+
     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
     const enhancedImageData = enhanceImage(imageData);
 
     const code = jsQR(enhancedImageData.data, canvas.width, canvas.height);
 
     if (code) {
-        return processQRCode(code, file.name);
+        return processQRCode(code, file.name, cantidad, periodo);
     } else {
         return {
             row: `
             <tr>
                 <td>${file.name}</td>
-                <td colspan="13">No se pudo leer el código QR.</td>
+                <td colspan="15">No se pudo leer el código QR.</td>
             </tr>`,
             data: {
                 'Archivo': file.name,
-                'Error': 'No se pudo leer el código QR.'
+                'Error': 'No se pudo leer el código QR.',
+                'Cantidad': cantidad,
+                'Período': periodo
             }
         };
     }
 }
 
-function processQRCode(code, fileName) {
+function processQRCode(code, fileName, cantidad, periodo) {
     const urlParams = new URLSearchParams(new URL(code.data).search);
     const base64String = urlParams.get('p');
     if (base64String) {
@@ -219,19 +228,18 @@ function processQRCode(code, fileName) {
 
         const rowData = {
             'Archivo': fileName,
-            'Ver': decodedData.ver,
             'Fecha': decodedData.fecha,
             'CUIT': decodedData.cuit,
-            'Punto de Venta': decodedData.ptoVta,
             'Tipo de Comprobante': tipoComprobanteDescripcion,
+            'Punto de Venta': decodedData.ptoVta,
             'Número de Comprobante': decodedData.nroCmp,
             'Importe': decodedData.importe,
-            'Moneda': decodedData.moneda,
-            'CTZ': decodedData.ctz,
             'Tipo de Documento del Receptor': decodedData.tipoDocRec,
             'Número de Documento del Receptor': decodedData.nroDocRec,
             'Tipo de Código de Autorización': decodedData.tipoCodAut,
-            'Código de Autorización': decodedData.codAut
+            'Código de Autorización': decodedData.codAut,
+            'Cantidad': cantidad,
+            'Período': periodo
         };
 
         return {
@@ -246,14 +254,59 @@ function processQRCode(code, fileName) {
             row: `
             <tr>
                 <td>${fileName}</td>
-                <td colspan="13">No se encontró el parámetro 'p' en el QR.</td>
+                <td colspan="15">No se encontró el parámetro 'p' en el QR.</td>
             </tr>`,
             data: {
                 'Archivo': fileName,
-                'Error': 'No se encontró el parámetro \'p\' en el QR.'
+                'Error': 'No se encontró el parámetro \'p\' en el QR.',
+                'Cantidad': cantidad,
+                'Período': periodo
             }
         };
     }
+}
+
+function extraerCantidad(texto) {
+    const regex = /Cantidad\s+U\.\s+Medida.*?(\d+),00/;
+    const match = texto.match(regex);
+    return match ? parseInt(match[1]) : null;
+}
+
+function extraerPeriodo(texto) {
+    const meses = {
+        'enero': 'Enero', 'febrero': 'Febrero', 'marzo': 'Marzo', 'abril': 'Abril',
+        'mayo': 'Mayo', 'junio': 'Junio', 'julio': 'Julio', 'agosto': 'Agosto',
+        'septiembre': 'Septiembre', 'octubre': 'Octubre', 'noviembre': 'Noviembre', 'diciembre': 'Diciembre',
+        'ene': 'Enero', 'feb': 'Febrero', 'mar': 'Marzo', 'abr': 'Abril',
+        'may': 'Mayo', 'jun': 'Junio', 'jul': 'Julio', 'ago': 'Agosto',
+        'sep': 'Septiembre', 'oct': 'Octubre', 'nov': 'Noviembre', 'dic': 'Diciembre',
+        '01': 'Enero', '02': 'Febrero', '03': 'Marzo', '04': 'Abril',
+        '05': 'Mayo', '06': 'Junio', '07': 'Julio', '08': 'Agosto',
+        '09': 'Septiembre', '10': 'Octubre', '11': 'Noviembre', '12': 'Diciembre'
+    };
+
+    const regex = /(?:MES DE |Periodo|Período|Mes)[:;]?\s*((?:\w+\.?\s*(?:de\s*)?\d{4})|(?:\d{2}[-\s]?\d{4})|(?:\w{3,}\.?\s*(?:de\s*)?\d{4}))/i;
+    const match = texto.match(regex);
+
+    if (match) {
+        let periodoStr = match[1].trim().toLowerCase();
+        periodoStr = periodoStr.replace(/\sde\s/g, ' ');
+        
+        let [mes, anio] = periodoStr.split(/\s+/);
+        mes = mes.toLowerCase();
+
+        if (meses[mes]) {
+            return `${meses[mes]} ${anio}`;
+        } else {
+            const mesEncontrado = Object.keys(meses).find(key => mes.includes(key) || key.includes(mes));
+            if (mesEncontrado) {
+                return `${meses[mesEncontrado]} ${anio}`;
+            } else {
+                return periodoStr.charAt(0).toUpperCase() + periodoStr.slice(1);
+            }
+        }
+    }
+    return null;
 }
 
 function enhanceImage(imageData) {
@@ -261,19 +314,64 @@ function enhanceImage(imageData) {
     for (let i = 0; i < data.length; i += 4) {
         const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
         const contrast = (brightness - 128) * 2 + 128;
-        data[i] = data[i + 1] = data[i + 2] = contrast > 255 ? 255 : contrast < 0 ? 0 : contrast;
+        const value = contrast > 255 ? 255 : (contrast < 0 ? 0 : contrast);
+        data[i] = data[i + 1] = data[i + 2] = value;
     }
     return imageData;
 }
 
 function exportToExcel() {
-    const ws = XLSX.utils.json_to_sheet(tableData);
+    const ws = XLSX.utils.json_to_sheet(tableData, { header: [
+        'Archivo', 'Ver', 'Fecha', 'CUIT', 'Punto de Venta', 'Tipo de Comprobante',
+        'Número de Comprobante', 'Importe', 'Moneda', 'CTZ', 'Tipo de Documento del Receptor',
+        'Número de Documento del Receptor', 'Tipo de Código de Autorización',
+        'Código de Autorización', 'Cantidad', 'Periodo'
+    ]});
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Datos de Facturas");
-    XLSX.writeFile(wb, "datos_facturas.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, 'Datos');
+    XLSX.writeFile(wb, 'datos_facturas.xlsx');
 }
 
-// Asegúrate de que el botón esté deshabilitado inicialmente
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('process-btn').disabled = true;
-});
+function extraerCantidad(texto) {
+    const regex = /Cantidad\s+U\.\s+Medida.*?(\d+),00/;
+    const match = texto.match(regex);
+    return match ? parseInt(match[1]) : null;
+}
+
+function extraerPeriodo(texto) {
+    const meses = {
+        'enero': 'Enero', 'febrero': 'Febrero', 'marzo': 'Marzo', 'abril': 'Abril',
+        'mayo': 'Mayo', 'junio': 'Junio', 'julio': 'Julio', 'agosto': 'Agosto',
+        'septiembre': 'Septiembre', 'octubre': 'Octubre', 'noviembre': 'Noviembre', 'diciembre': 'Diciembre',
+        'ene': 'Enero', 'feb': 'Febrero', 'mar': 'Marzo', 'abr': 'Abril',
+        'may': 'Mayo', 'jun': 'Junio', 'jul': 'Julio', 'ago': 'Agosto',
+        'sep': 'Septiembre', 'oct': 'Octubre', 'nov': 'Noviembre', 'dic': 'Diciembre',
+        '01': 'Enero', '02': 'Febrero', '03': 'Marzo', '04': 'Abril',
+        '05': 'Mayo', '06': 'Junio', '07': 'Julio', '08': 'Agosto',
+        '09': 'Septiembre', '10': 'Octubre', '11': 'Noviembre', '12': 'Diciembre'
+    };
+
+    const regex = /(?:MES DE |Periodo|Período|Mes)[:;]?\s*((?:\w+\.?\s*(?:de\s*)?\d{4})|(?:\d{2}[-\s]?\d{4})|(?:\w{3,}\.?\s*(?:de\s*)?\d{4}))/i;
+    const match = texto.match(regex);
+
+    if (match) {
+        let periodoStr = match[1].trim().toLowerCase();
+        periodoStr = periodoStr.replace(/\sde\s/g, ' ');
+        
+        let [mes, anio] = periodoStr.split(/\s+/);
+        mes = mes.toLowerCase();
+
+        if (meses[mes]) {
+            return `${meses[mes]} ${anio}`;
+        } else {
+            const mesEncontrado = Object.keys(meses).find(key => mes.includes(key) || key.includes(mes));
+            if (mesEncontrado) {
+                return `${meses[mesEncontrado]} ${anio}`;
+            } else {
+                return periodoStr.charAt(0).toUpperCase() + periodoStr.slice(1);
+            }
+        }
+    }
+    return null;
+    
+}
