@@ -13,6 +13,15 @@ h1 {
 table {
     width: 100%;
     margin: 20px 0;
+    border-collapse: separate;
+    border-spacing: 15px; /* Esto separa las columnas */
+    border: 1px solid #ddd; /* Esto agrega borde a la tabla */
+}
+
+th, td {
+    padding: 8px; /* Esto agrega espaciado dentro de las celdas */
+    text-align: left;
+    border: 1px solid #ddd; /* Esto agrega borde a las celdas */
 }
 
 th {
