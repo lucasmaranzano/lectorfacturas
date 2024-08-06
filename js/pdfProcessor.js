@@ -27,15 +27,28 @@ export async function processFiles(tableData) {
     tableData.length = 0;
     let tableContent = createTableHeader();
 
-    for (const file of files) {
+    // Mostrar la barra de progreso
+    const progressBar = document.querySelector('.progress');
+    const progressBarFill = progressBar.querySelector('.determinate');
+    progressBar.style.display = 'block';
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         const result = await processFile(file);
         tableContent += result.row;
         if (result.data) tableData.push(result.data);
+
+        // Actualizar la barra de progreso
+        const progress = ((i + 1) / files.length) * 100;
+        progressBarFill.style.width = `${progress}%`;
     }
 
     tableContent += `</table>`;
     document.getElementById('output').innerHTML = tableContent;
     document.getElementById('export-btn').style.display = 'block';
+
+    // Ocultar la barra de progreso cuando se complete
+    progressBar.style.display = 'none';
 
     updateProcessButton();
 }

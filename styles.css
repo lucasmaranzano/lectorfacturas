@@ -14,14 +14,14 @@ table {
     width: 100%;
     margin: 20px 0;
     border-collapse: separate;
-    border-spacing: 15px; /* Esto separa las columnas */
-    border: 1px solid #ddd; /* Esto agrega borde a la tabla */
+    border-spacing: 15px;
+    border: 1px solid #ddd;
 }
 
 th, td {
-    padding: 8px; /* Esto agrega espaciado dentro de las celdas */
+    padding: 8px;
     text-align: left;
-    border: 1px solid #ddd; /* Esto agrega borde a las celdas */
+    border: 1px solid #ddd;
 }
 
 th {
@@ -43,4 +43,12 @@ th {
 
 .file-field .btn:hover {
     background-color: #2bbbad;
+}
+
+.progress {
+    margin-top: 20px;
+}
+
+.progress .determinate {
+    transition: width 0.3s ease;
 }
